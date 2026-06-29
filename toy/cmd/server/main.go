@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-const readTimeout = 2 * time.Second
+const readTimeout = 10 * time.Second
 const writeTimeout = 2 * time.Second
 
 func main() {
-	addr := "127.0.0.1:9000"
+	addr := "127.0.0.1:9001"
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -44,46 +44,58 @@ func handleConn(conn net.Conn) {
 
 	log.Printf("accepted connection from %s", remoteAddr)
 
-	err := conn.SetReadDeadline(time.Now().Add(readTimeout))
-	if err != nil {
-		log.Printf("set read deadline for %s: %v", remoteAddr, err)
-		return
-	}
-
 	reader := bufio.NewReader(conn)
-	line, err := reader.ReadString('\n')
+	for {
 
-	if err != nil {
-		// log.Printf("read from %s: %v", remoteAddr, err)
-		handleReadError(remoteAddr, err)
-		return
+		err := conn.SetReadDeadline(time.Now().Add(readTimeout))
+		if err != nil {
+			log.Printf("set read deadline for %s: %v", remoteAddr, err)
+			return
+		}
+
+		line, err := reader.ReadString('\n')
+
+		if err != nil {
+			// log.Printf("read from %s: %v", remoteAddr, err)
+			handleReadError(remoteAddr, err)
+			return
+		}
+
+		msg := strings.TrimSpace(line)
+		log.Printf("received from %s: %q", remoteAddr, msg)
+
+		err = conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+		if err != nil {
+			log.Printf("write to %s: %v", remoteAddr, err)
+			return
+		}
+
+		switch msg {
+		case "HEALTH":
+			_, err = fmt.Fprintln(conn, "OK")
+
+		case "PING":
+			if _, err := fmt.Fprintln(conn, "PONG"); err != nil {
+				handleWriteError(remoteAddr, err)
+				return
+			}
+			log.Printf("sent PONG to %s", remoteAddr)
+
+		case "FLOOD":
+			flood(conn)
+
+		default:
+			_, err = fmt.Fprintln(conn, "UNKNOWN")
+		}
+
+		if err != nil {
+			// log.Printf("write to %s: %v", remoteAddr, err)
+			handleWriteError(remoteAddr, err)
+			return
+		}
+
+		log.Printf("closed connection from %s", remoteAddr)
 	}
-
-	msg := strings.TrimSpace(line)
-	log.Printf("received from %s: %q", remoteAddr, msg)
-
-	err = conn.SetWriteDeadline(time.Now().Add(writeTimeout))
-	if err != nil {
-		log.Printf("write to %s: %v", remoteAddr, err)
-		return
-	}
-
-	switch msg {
-	case "HEALTH":
-		_, err = fmt.Fprintln(conn, "OK")
-	case "FLOOD":
-		flood(conn)
-	default:
-		_, err = fmt.Fprintln(conn, "UNKNOWN")
-	}
-
-	if err != nil {
-		// log.Printf("write to %s: %v", remoteAddr, err)
-		handleWriteError(remoteAddr, err)
-		return
-	}
-
-	log.Printf("closed connection from %s", remoteAddr)
 }
 
 func isTimeout(err error) bool {
