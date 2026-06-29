@@ -11,6 +11,8 @@ import (
 )
 
 func main() {
+	// localhost with a different port always returns a quick unhealthy error, to get a TIMEOUT one
+	// try 8.8.8.8:8888
 	addr := flag.String("addr", "127.0.0.1:9000", "TCP address to check")
 	timeout := flag.Duration("timeout", 2*time.Second, "dial timeout")
 	flag.Parse()
@@ -46,7 +48,7 @@ func main() {
 	response := strings.TrimSpace(line)
 
 	if response == "OK" {
-		fmt.Println("healthy")
+		fmt.Printf("healthy: connected in %s\n", elapsed)
 		return
 	}
 
