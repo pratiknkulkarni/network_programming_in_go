@@ -34,6 +34,7 @@ func main() {
 	defer conn.Close()
 
 	_, err = fmt.Fprintln(conn, "HEALTH")
+	// _, err = fmt.Fprint(conn, "HEALTH")
 	if err != nil {
 		log.Fatalf("write health request: %v", err)
 	}
