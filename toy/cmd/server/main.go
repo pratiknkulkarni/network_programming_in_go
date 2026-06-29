@@ -71,6 +71,8 @@ func handleConn(conn net.Conn) {
 	switch msg {
 	case "HEALTH":
 		_, err = fmt.Fprintln(conn, "OK")
+	case "FLOOD":
+		flood(conn)
 	default:
 		_, err = fmt.Fprintln(conn, "UNKNOWN")
 	}
@@ -110,4 +112,21 @@ func handleReadError(remoteAddr string, err error) {
 	}
 
 	log.Printf("read from %s: %v", remoteAddr, err)
+}
+
+func flood(conn net.Conn) error {
+	chunk := strings.Repeat("x", 1024*1024)
+
+	for i := 0; i < 10_000; i++ {
+		if err := conn.SetWriteDeadline(time.Now().Add(1 * time.Second)); err != nil {
+			return err
+		}
+
+		_, err := fmt.Fprintln(conn, chunk)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
